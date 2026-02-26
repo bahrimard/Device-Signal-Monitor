@@ -1,0 +1,17 @@
+{
+	"folders": [
+		{
+			"name": "ESP32-S3-QRCodeScanner",
+			"path": "."
+		}
+	],
+	"settings": {
+		"files.associations": {
+			"*.py": "python",
+			"*.mmd": "mermaid",
+			"array": "cpp",
+			"string": "cpp",
+			"string_view": "cpp"
+		}
+	}
+}
