@@ -1,63 +1,67 @@
-/*
- * Device Signal Monitor
- * Board: ESP32-S3 Mini
- * Author: bahrimardiansyah@gmail.com
- */
-
 #include <Arduino.h>
 
-// ================= CONFIG =================
 static const gpio_num_t SIGNAL_PIN = GPIO_NUM_4;
-static const uint32_t DEBOUNCE_MS = 50;
-// ==========================================
+static const uint32_t STABLE_TIME_MS = 50;   // bisa 30–100ms
 
-volatile bool signalChanged = false;
-volatile uint32_t lastInterruptTime = 0;
-bool currentState = false;
+volatile bool interruptTriggered = false;
 
-// Interrupt handler
+bool currentStableState = false;
+bool lastReadState = false;
+
+uint32_t lastChangeTime = 0;
+
 void IRAM_ATTR handleInterrupt()
 {
-  uint32_t now = millis();
-  if (now - lastInterruptTime > DEBOUNCE_MS)
-  {
-    signalChanged = true;
-    lastInterruptTime = now;
-  }
+  interruptTriggered = true;
 }
 
 void setup()
 {
   Serial.begin(115200);
 
-  // Configure pin with internal pulldown
-  pinMode(SIGNAL_PIN, INPUT_PULLDOWN);
+  pinMode(SIGNAL_PIN, INPUT);
 
-  // Attach interrupt
-  attachInterrupt(SIGNAL_PIN, handleInterrupt, CHANGE);
+  attachInterrupt(digitalPinToInterrupt(SIGNAL_PIN), handleInterrupt, CHANGE);
+
+  currentStableState = digitalRead(SIGNAL_PIN);
+  lastReadState = currentStableState;
+  lastChangeTime = millis();
 
   Serial.println("Signal Monitor Started");
+  Serial.printf(">>> Initial State: %d\n", currentStableState);
 }
 
 void loop()
 {
-  if (signalChanged)
+  if (interruptTriggered)
   {
-    signalChanged = false;
+    interruptTriggered = false;
 
     bool newState = digitalRead(SIGNAL_PIN);
 
-    if (newState != currentState)
+    if (newState != lastReadState)
     {
-      currentState = newState;
+      lastReadState = newState;
+      lastChangeTime = millis();   // reset timer tiap ada perubahan
+    }
+  }
 
-      if (currentState)
+  // cek stabil tanpa delay
+  if ((millis() - lastChangeTime) >= STABLE_TIME_MS)
+  {
+    if (currentStableState != lastReadState)
+    {
+      currentStableState = lastReadState;
+
+      Serial.printf(">>> Stable State: %d\n", currentStableState);
+
+      if (currentStableState == LOW)
       {
-        Serial.println(">>> SIGNAL HIGH (Device Connected)");
+        Serial.println(">>> DEVICE DISCONNECTED");
+        Serial.println(">>> HIT API -> SEND MESSAGE");
       }
-      else
-      {
-        Serial.println(">>> SIGNAL LOW (Device Disconnected)");
+      else {
+        Serial.println(">>> DEVICE CONNECTED");
       }
     }
   }
